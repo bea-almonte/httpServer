@@ -13,24 +13,27 @@
 #include <sstream> // stringstream
 //#include <thread>
 
-#define PORT 60003
+#define PORT 60002
 typedef struct {
     int sock; // socket
     struct sockaddr address; // address of client
     unsigned int addr_len;   // length of address
 } connection_t;
 
-std::string findLength(char * fileName);
-char * readFile(char *fileName, int&sock);
-void * Process(void * ptr);
-std::string parseResponse(char * buffer);
-void chooseFile(std::string fileName);
+std::string parseResponse(char * buffer); // get file requested
+std::string findLength(char * fileName); // find length of buffer
+std::string findLengthImg(char * fileName); // find length for image ???
+void readFile(char *fileName, int&sock); // send html file -- rename
+void * Process(void * ptr); // create socket
+void chooseFile(std::string fileName); // pick what kind of file send, send that file
+void sendImage(char * fileName,int &sock); // send image (doesn't work...)
 
 int main() {
     int sock = -1;
     struct sockaddr_in address;
     connection_t * connection;
     pthread_t thread;
+
     // create socket
     sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock <= 0) {
@@ -48,7 +51,6 @@ int main() {
     }
 
     // listen to port
-
     if (listen(sock,5) < 0) {
         std::cerr << "Error: Cannot listen on port.\n";
         return -3;
@@ -70,24 +72,78 @@ int main() {
     }
 }
 
-char * readFile(char * fileName,int &sock) {
-    //std::ifstream inFile("hello-there.jpg", std::ifstream::in);
+void sendImage(char * fileName,int &sock) {
     char * fileBuffer = new char[4096];
+    long long bytesRecv = 0;
+    int fd1 = open(fileName, O_RDONLY, 0); 
+
+    // clear buffer
+    memset(fileBuffer,0,4096);
+
+    std::string file_len = findLengthImg(fileName); // find length of image
+
+    // convert string to cstring
+    char * charLength = new char[file_len.size()+1];
+    std::strcpy(charLength,file_len.c_str());
+    
+    // send length
+    send(sock, charLength,sizeof(charLength), 0);
+    // send line breaks
+    send(sock, "\r\n\r\n", sizeof("\r\n\r\n"), 0);
+    
+    // check if file can be opened
+    if (fd1 == -1) {
+        std::cout << "This isn't how you read file.\n";
+        
+    } else {
+        std::cout << "Okay... opened file\n";
+    }
+
+    // keep sending as much memory in file until all bytes are sent
+    do {
+        memset(fileBuffer,0,4096);
+        bytesRecv = read(fd1, fileBuffer, 4096);
+        send(sock, fileBuffer, strlen(fileBuffer), 0);
+    } while (bytesRecv > 0);
+
+
+    std::cout << "Length of image: " << file_len << std::endl;
+
+    // deallocate char
+    delete[] fileBuffer;
+    delete[] charLength;
+}
+
+
+void readFile(char * fileName,int &sock) {
+    char * fileBuffer = new char[4096];
+    int bytesRecv = 0;
+    // try to open file
     int fd1 = open(fileName, O_RDONLY, 0); 
 
     // new
     memset(fileBuffer,0,4096);
 
-    int bytesRecv = 0;
-
+    // find length of message
     std::string file_len = findLength(fileName);
-
+    // convert length to cstring
     char * charLength = new char[file_len.size()+1];
+    std::strcpy(charLength,file_len.c_str());
 
-    // send length
+    // check if file opened successfully
+    if (fd1 == -1) {
+        std::cout << "This isn't how you read file.\n";
+        
+    } else {
+        std::cout << "Okay... opened file\n";
+    }
+
+    // send length of message
     send(sock, charLength,sizeof(charLength), 0);
-    // /r/nr/n
+    // send line breaks
     send(sock, "\r\n\r\n", sizeof("\r\n\r\n"), 0);
+
+    // send as many bytes until all bytes are sent
     do {
         memset(fileBuffer,0,4096);
         bytesRecv = read(fd1, fileBuffer, 4096);
@@ -102,40 +158,47 @@ char * readFile(char * fileName,int &sock) {
         std::cout << "Okay... opened file\n";
     }
 
-    //file_len = bytesRecv;
-    std::cout << "Test: " << file_len << std::endl;
-    //std::cout << fileBuffer;
-    return fileBuffer;
+    std::cout << "Length of HTML file:" << file_len << std::endl;
+
+    // deallocate memory
+    delete[] fileBuffer;
+    delete[] charLength;
 }
 
 std::string parseResponse(char * buffer) {
     std::stringstream ss;
     std::string request;
     std::string fileName;
+
+    // GET, POST etc..
     ss << buffer;
     ss >> request;
+    // file name requested
     ss << buffer;
     ss >> fileName;
+    // delete '/' if not first page
     if (fileName.length() > 1) {
         fileName.erase(0,1);
     }
+
     std::cout << "RESULTS: " << request << " " << fileName << std::endl;
 
     return fileName;
 }
 
-
-std::string findLength(char * fileName) {
+std::string findLengthImg(char * fileName) {
+    std::string stringLength;
     char * fileBuffer = new char[4096];
     int fd1 = open(fileName, O_RDONLY, 0); 
     int file_len = 0;
-    std::string stringLength;
-    // new
+    long long bytesRecv = 0;
+    
+ 
     memset(fileBuffer,0,4096);
 
-    int bytesRecv = 0;
     
-
+    
+    // keep reading until bytes are all read
     do {
         memset(fileBuffer,0,4096);
         bytesRecv = read(fd1, fileBuffer, 4096);
@@ -144,15 +207,42 @@ std::string findLength(char * fileName) {
 
     stringLength = std::to_string(file_len);
 
-    std::cout << "Test: " << stringLength << std::endl;
-    //std::cout << fileBuffer;
+    std::cout << "Initial Image Length: " << stringLength << std::endl;
+    // deallocate char
+    delete[] fileBuffer;
+
+    return stringLength;
+}
+std::string findLength(char * fileName) {
+    std::string stringLength;
+    char * fileBuffer = new char[4096];
+    int fd1 = open(fileName, O_RDONLY, 0); 
+    int file_len = 0;
+    int bytesRecv = 0;
+    
+    // clear buffer
+    memset(fileBuffer,0,4096);
+
+    // keep reading until all bytes are read
+    do {
+        memset(fileBuffer,0,4096);
+        bytesRecv = read(fd1, fileBuffer, 4096);
+        file_len += bytesRecv;
+    } while (bytesRecv > 0);
+
+    // convert length to string
+    stringLength = std::to_string(file_len);
+
+    std::cout << "Initial HTML Length: " << stringLength << std::endl;
+ 
     return stringLength;
 }
 
 void chooseFile(std::string fileName, int &sock){
     char * charName = new char[fileName.size()+1];
     char * response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-length: ";
-
+    char * img_response = "HTTP/1.1 200 OK\r\nContent-Type: image/jpg\r\nContent-length: ";
+    // change filename into cstring
     std::strcpy(charName,fileName.c_str());
 
     std::cout << "CHAR NAME: " << charName << std::endl;
@@ -161,77 +251,54 @@ void chooseFile(std::string fileName, int &sock){
     } else if (fileName == "/") {
         // send html front
         send(sock , response , strlen(response) , 0 );
-        readFile("test.html",sock);
-    } else {
+        readFile("front.html",sock);
+    } else if(fileName.find("html",0) != -1){
+        std::cout << "Sending HTML file...\n";
         send(sock , response , strlen(response) , 0 );
         readFile(charName, sock);
-        
+    } else if(fileName.find("jpg",0) != -1) {
+        std::cout << "Sending image file...\n";
+        send(sock , img_response , strlen(img_response) , 0 );
+        sendImage(charName, sock);
+    } else {
+        send(sock , response , strlen(response) , 0 );
+        readFile("test3.html",sock);
     }
+
+    // deallocate charNAme
+    delete[] charName;
     
 }
 
 void * Process(void * ptr) {
     char * buffer = new char[4096];
-    int len;
-// read file test
-    char * fileName = "test3.html";
-
     connection_t * conn;
+    // For testing
+    char * fileName = "test3.html";
     char * hello = "Hellot there\n";
-    
     char * test = "<h1>Hello World</h1>";
 
-    
-    //sprintf(some_len, "%d",length);
-    //strcpy(response,some_len);
-    //strcat(Sresponse,ending);
-    //const char * response = Sresponse.c_str();
-    //response.append(ending);
 
     if (!ptr) {
         pthread_exit(0);
     }
     
     conn = (connection_t *)ptr;
-    // put in loop
- 
     
-    // read message length
-    //read(conn->sock,&len,sizeof(int)); 
-    if (1 > 0) {
-        // allocate buffer memory
-        //buffer = (char*)malloc((len+1)*sizeof(char));
-        //buffer[len] = 0;
-        // read length
-        memset(buffer,0,4096);
-        int bytesRecv = read(conn->sock, buffer, 4096);
-        //read(conn->sock, buffer, len);
-        
-        printf("%s\n",buffer);
-        //parseResponse(buffer);
-        //std::cout << buffer << buffer;
+    // clear buffer
+    memset(buffer,0,4096);
+    int bytesRecv = read(conn->sock, buffer, 4096);
 
-        std::cout << "Trying to send.\n";
-        // header
-        // switch
-        // case a image
-        // case b 
         
-        // length
-        
-        
-        // read file and send
-        chooseFile(parseResponse(buffer),conn->sock);
-        
-        /* if (send(conn->sock, fileBuffer , html_len , 0 ) == -1) {
-            std::cout << "Gahhh, you did it wrong.\n";
-        } */
-        
-        free(buffer);
-    }
-    //is.close();
-    //close(fd1);
-    //delete[] fileBuffer;
+    printf("%s\n",buffer);
+
+    std::cout << "Trying to send.\n";
+
+    // read file and send
+    chooseFile(parseResponse(buffer),conn->sock);
+             
+    delete[] buffer;
+    
     close(conn->sock);
     free(conn);
     pthread_exit(0);
