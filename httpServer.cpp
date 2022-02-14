@@ -9,10 +9,11 @@
 #include <fstream>
 #include <fcntl.h>
 #include <string>
+#include <cstring>
+#include <sstream> // stringstream
 //#include <thread>
 
-#define PORT 60022
-
+#define PORT 60003
 typedef struct {
     int sock; // socket
     struct sockaddr address; // address of client
@@ -22,7 +23,8 @@ typedef struct {
 std::string findLength(char * fileName);
 char * readFile(char *fileName, int&sock);
 void * Process(void * ptr);
-
+std::string parseResponse(char * buffer);
+void chooseFile(std::string fileName);
 
 int main() {
     int sock = -1;
@@ -81,6 +83,7 @@ char * readFile(char * fileName,int &sock) {
     std::string file_len = findLength(fileName);
 
     char * charLength = new char[file_len.size()+1];
+
     // send length
     send(sock, charLength,sizeof(charLength), 0);
     // /r/nr/n
@@ -105,6 +108,23 @@ char * readFile(char * fileName,int &sock) {
     return fileBuffer;
 }
 
+std::string parseResponse(char * buffer) {
+    std::stringstream ss;
+    std::string request;
+    std::string fileName;
+    ss << buffer;
+    ss >> request;
+    ss << buffer;
+    ss >> fileName;
+    if (fileName.length() > 1) {
+        fileName.erase(0,1);
+    }
+    std::cout << "RESULTS: " << request << " " << fileName << std::endl;
+
+    return fileName;
+}
+
+
 std::string findLength(char * fileName) {
     char * fileBuffer = new char[4096];
     int fd1 = open(fileName, O_RDONLY, 0); 
@@ -115,12 +135,10 @@ std::string findLength(char * fileName) {
 
     int bytesRecv = 0;
     
-    
 
     do {
         memset(fileBuffer,0,4096);
         bytesRecv = read(fd1, fileBuffer, 4096);
-        std::cout << fileBuffer;
         file_len += bytesRecv;
     } while (bytesRecv > 0);
 
@@ -131,15 +149,36 @@ std::string findLength(char * fileName) {
     return stringLength;
 }
 
+void chooseFile(std::string fileName, int &sock){
+    char * charName = new char[fileName.size()+1];
+    char * response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-length: ";
+
+    std::strcpy(charName,fileName.c_str());
+
+    std::cout << "CHAR NAME: " << charName << std::endl;
+    if (open(charName, O_RDONLY, 0) == -1) {
+        std::cout << "File doesn't exist. Sending error message.\n";
+    } else if (fileName == "/") {
+        // send html front
+        send(sock , response , strlen(response) , 0 );
+        readFile("test.html",sock);
+    } else {
+        send(sock , response , strlen(response) , 0 );
+        readFile(charName, sock);
+        
+    }
+    
+}
+
 void * Process(void * ptr) {
     char * buffer = new char[4096];
     int len;
 // read file test
-    char * fileName = "test2.html";
+    char * fileName = "test3.html";
 
     connection_t * conn;
     char * hello = "Hellot there\n";
-    char * response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-length: ";
+    
     char * test = "<h1>Hello World</h1>";
 
     
@@ -156,7 +195,7 @@ void * Process(void * ptr) {
     conn = (connection_t *)ptr;
     // put in loop
  
-
+    
     // read message length
     //read(conn->sock,&len,sizeof(int)); 
     if (1 > 0) {
@@ -167,18 +206,22 @@ void * Process(void * ptr) {
         memset(buffer,0,4096);
         int bytesRecv = read(conn->sock, buffer, 4096);
         //read(conn->sock, buffer, len);
-
+        
         printf("%s\n",buffer);
+        //parseResponse(buffer);
         //std::cout << buffer << buffer;
 
         std::cout << "Trying to send.\n";
         // header
-        send(conn->sock , response , strlen(response) , 0 );
+        // switch
+        // case a image
+        // case b 
+        
         // length
         
         
         // read file and send
-        readFile(fileName, conn->sock);
+        chooseFile(parseResponse(buffer),conn->sock);
         
         /* if (send(conn->sock, fileBuffer , html_len , 0 ) == -1) {
             std::cout << "Gahhh, you did it wrong.\n";
