@@ -13,7 +13,7 @@
 #include <sstream> // stringstream
 //#include <thread>
 
-#define PORT 60002
+#define PORT 60001
 typedef struct {
     int sock; // socket
     struct sockaddr address; // address of client
@@ -80,16 +80,20 @@ void sendImage(char * fileName,int &sock) {
     // clear buffer
     memset(fileBuffer,0,4096);
 
-    std::string file_len = findLengthImg(fileName); // find length of image
+/*     std::string file_len = findLengthImg(fileName); // find length of image
 
     // convert string to cstring
     char * charLength = new char[file_len.size()+1];
     std::strcpy(charLength,file_len.c_str());
-    
+     */
     // send length
-    send(sock, charLength,sizeof(charLength), 0);
-    // send line breaks
-    send(sock, "\r\n\r\n", sizeof("\r\n\r\n"), 0);
+ /*    send(sock, charLength,sizeof(charLength), 0);
+    // send line breaks */
+
+    // attach header 
+    sprintf(fileBuffer,"HTTP/1.1 200 OK\r\n\r\n");
+    // send header
+    write(sock,fileBuffer,strlen(fileBuffer));
     
     // check if file can be opened
     if (fd1 == -1) {
@@ -103,15 +107,15 @@ void sendImage(char * fileName,int &sock) {
     do {
         memset(fileBuffer,0,4096);
         bytesRecv = read(fd1, fileBuffer, 4096);
-        send(sock, fileBuffer, strlen(fileBuffer), 0);
+        write(sock,fileBuffer,bytesRecv);
     } while (bytesRecv > 0);
-
-
-    std::cout << "Length of image: " << file_len << std::endl;
+    //send(sock, fileBuffer, 4096, 0);
+    
+    //std::cout << "Length of image: " << file_len << std::endl;
 
     // deallocate char
     delete[] fileBuffer;
-    delete[] charLength;
+    //delete[] charLength;
 }
 
 
@@ -150,7 +154,7 @@ void readFile(char * fileName,int &sock) {
         send(sock, fileBuffer, strlen(fileBuffer), 0);
     } while (bytesRecv > 0);
 
-
+    send(sock, fileBuffer, 4096, 0);
     if (fd1 == -1) {
         std::cout << "This isn't how you read file.\n";
         
@@ -188,9 +192,9 @@ std::string parseResponse(char * buffer) {
 
 std::string findLengthImg(char * fileName) {
     std::string stringLength;
-    char * fileBuffer = new char[4096];
+    int * fileBuffer = new int[4096];
     int fd1 = open(fileName, O_RDONLY, 0); 
-    int file_len = 0;
+    long long file_len = 0;
     long long bytesRecv = 0;
     
  
@@ -258,7 +262,8 @@ void chooseFile(std::string fileName, int &sock){
         readFile(charName, sock);
     } else if(fileName.find("jpg",0) != -1) {
         std::cout << "Sending image file...\n";
-        send(sock , img_response , strlen(img_response) , 0 );
+/*         std::cout << img_response << std::endl;
+        send(sock , img_response , strlen(img_response) , 0 ); */
         sendImage(charName, sock);
     } else {
         send(sock , response , strlen(response) , 0 );
