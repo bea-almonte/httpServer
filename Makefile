@@ -8,4 +8,4 @@ httpServer: httpServer.o
 
 clean:
 	rm -rf *.dSYM
-	$(RM) *.o *.gc*
+	$(RM) *.o *.gc* httpServer
