@@ -1,3 +1,8 @@
+// Bea Almonte
+// httpServer.cpp
+// This code creates an HTTP server capable of parsing requests
+// and sending files
+
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/socket.h>
@@ -10,8 +15,7 @@
 #include <fcntl.h>
 #include <string>
 #include <cstring>
-#include <sstream> // stringstream
-//#include <thread>
+#include <sstream> 
 
 #define PORT 60001
 typedef struct {
@@ -20,11 +24,11 @@ typedef struct {
     unsigned int addr_len;   // length of address
 } connection_t;
 
-std::string parseResponse(char * buffer); // get file requested
+std::string parseResponse(char * buffer); // parse request from client
 std::string findLength(char * fileName); // find length of buffer
 void * Process(void * ptr); // create socket
-void chooseFile(std::string fileName); // pick what kind of file send, send that file
-void sendImage(char * fileName,int &sock); // send image (doesn't work...)
+void chooseFile(std::string fileName); // check if file exists, send file
+void sendFile(char * fileName,int &sock); // sends file through socket
 
 int main(int argc, char** argv) {
     int sock = -1;
@@ -87,7 +91,8 @@ int main(int argc, char** argv) {
     }
 }
 
-void sendImage(char * fileName,int &sock) {
+// send file from parsed input
+void sendFile(char * fileName,int &sock) {
     char * fileBuffer = new char[4096];
     long long bytesRecv = 0;
     long long totSent = 0;
@@ -122,12 +127,13 @@ void sendImage(char * fileName,int &sock) {
     delete[] fileBuffer;
 }
 
+// parse request from client
 std::string parseResponse(char * buffer) {
     std::stringstream ss;
     std::string request;
     std::string fileName;
 
-    // GET, POST etc..
+    // GET
     ss << buffer;
     ss >> request;
     // file name requested
@@ -142,6 +148,7 @@ std::string parseResponse(char * buffer) {
     return fileName;
 }
 
+// find length of file to be sent
 std::string findLength(char * fileName) {
     std::string stringLength;
     char * fileBuffer = new char[4096];
@@ -166,6 +173,7 @@ std::string findLength(char * fileName) {
     return stringLength;
 }
 
+// attempt to open or send error
 void chooseFile(std::string fileName, int &sock){
     char * charName = new char[fileName.size()+1];
     char * error = "HTTP/1.0 404 Not Found\r\n\r\n<h1>404 Not Found</h1>";
@@ -179,11 +187,11 @@ void chooseFile(std::string fileName, int &sock){
         std::cout << "File " << charName << " doesn't exist. Sending error message.\n";
     } else if (fileName == "/") {
         // send html front
-        sendImage("front.html",sock);
+        sendFile("front.html",sock);
     } else {
         //send(sock , response , strlen(response) , 0 );
         std::cout << "Sending " << fileName << std::endl;
-        sendImage(charName,sock);
+        sendFile(charName,sock);
     }
 
     // deallocate charNAme
@@ -204,7 +212,7 @@ void * Process(void * ptr) {
     // clear buffer
     memset(buffer,0,4096);
     // read request
-    int bytesRecv = read(conn->sock, buffer, 4096);
+    read(conn->sock, buffer, 4096);
 
         
     std::cout << "\nAttempting to transmit file.\n";
