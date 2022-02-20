@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
         return -3;
     }
 
-    std::cout << "Server ready and listening.\n\n";
+    std::cout << "Server ready and listening.\n";
 
     while (true) {
         // accept connection
@@ -84,6 +84,7 @@ int main(int argc, char** argv) {
         if (connection->sock <= 0) {
             free(connection);
         } else {
+            std::cout << "\n===============================\n";
             std::cout << "Created thread.\n";
             pthread_create(&thread,0,Process, (void*)connection);
             pthread_detach(thread);
@@ -112,7 +113,7 @@ void sendFile(char * fileName,int &sock) {
         
     }
     
-    std::cout << "\nAttempting to transmit " << findLength(fileName) << " bytes.\n\n";
+    std::cout << "\nAttempting to transmit " << findLength(fileName) << " bytes.\n";
 
     // keep sending as much memory in file until all bytes are sent
     do {
@@ -122,7 +123,7 @@ void sendFile(char * fileName,int &sock) {
         write(sock,fileBuffer,bytesRecv);
     } while (bytesRecv > 0);
     
-    std::cout << "\nSuccessfully transmitted " << totSent << " bytes.\n\n";
+    std::cout << "Successfully transmitted " << totSent << " bytes.\n\n";
     // deallocate char
     delete[] fileBuffer;
 }
@@ -213,9 +214,6 @@ void * Process(void * ptr) {
     memset(buffer,0,4096);
     // read request
     read(conn->sock, buffer, 4096);
-
-        
-    std::cout << "\nAttempting to transmit file.\n";
 
     // read file and send
     chooseFile(parseResponse(buffer),conn->sock);
