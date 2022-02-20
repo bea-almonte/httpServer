@@ -13,7 +13,7 @@ This project implements an HTTP server to be run by a browser client.
 | front.html           | favicon.ico        |
 | hello-there.html     | hello-there.jpg    |
 | general-grevious.gif | bee-movie.html     |
-| bee.jpg              |                    |
+| bee.jpg              | screenCaptures.pdf |
 |                      |                    |
 
 
